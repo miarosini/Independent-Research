@@ -1,0 +1,146 @@
+---
+title: "Report 3: ANES"
+author: "Brandon Callegari, Mia Rosini"
+date: "April 14, 2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	fig.pos = "h"
+)
+options(digits = 3)
+set.seed(1234567)
+
+output_type <- ifelse(knitr::is_latex_output(),  
+                      "latex", "html")           
+```
+
+```{r, include=FALSE}
+#load in packages
+library(janitor)
+library(dplyr)
+library(infer)
+library(ggplot2)
+library(ggridges)
+library(tidyr)
+library(forcats)
+library(gridExtra)
+library(stargazer)
+library(kableExtra)
+library(interactions)
+```
+
+```{r, echo = FALSE}
+#read in and clean data for the data on support for govt. health care by income
+income_support <- read.csv("Income_data.csv")
+income_support <- clean_names(income_support)
+income_support <- income_support %>% rename(year = year)
+#glimpse(income_support)
+```
+
+```{r, echo = FALSE}
+#regression for simple model (relationship between income and support of govt. health insurance)
+lm_support_simple <- lm(support ~ income, data = income_support)
+#lm_support_simple
+#summary(lm_support_simple)
+```
+
+```{r, echo = FALSE}
+#regression for full model (relationship between income and support of govt. health insurance, taking year into account)
+lm_support_full <- lm(support ~ income + year, data = income_support)
+#lm_support_full
+#summary(lm_support_full)
+```
+
+```{r, echo = FALSE}
+#regression for interaction model (relationship between income and support of govt. health insurance)
+lm_support_interaction <- lm(support ~ (income * year), data = income_support)
+#lm_support_interaction
+#summary(lm_support_interaction)
+```
+
+## 1 Introduction
+
+The research question of this report is: Does decreasing income level increase support for government health insurance (such as the Affordable Care Act). This topic is important because household spending on healthcare is one of the biggest contributors to income inequality in the United States; according to research done at Harvard Medical School and explained in "The American Health-Care System Increases Income Inequality" by Vann R. Newkirk II, medical expenses push millions of Americans below the poverty line, and health care is a major burden for low-income people. Additionally, medical debt is a major contributor to bankruptcy in the United States (Newkirk, 2018). This paper sets up a debate over which income groups are most  benefited and in support of government health care. This topic is worth investigating because subsidized or free health insurance is a hotly debated topic today between Democrats and Republicans. More specifically, support for the Affordable Care Act is divided. At the moment, the fate of the Affordable Care Act is uncertain, since Trump was elected with the promise of repealing it. This investigation will research whether decreasing income increases support for government health insurance.   
+
+## 2 Theory
+
+There are two competing theories related to our question. The first theory is that low-income groups are hurt by government health insurance and the second theory is that low-income groups are the ones benefitted the most by government health insurance. The first theory is supported by "The American Health-Care System Increases Income Inequality" by Vann R. Newkirk II. According to this article, government healthcare is a major burden for low-income people. Newkirk argues that the burden is mainly a result of the fact that these health policies have increased deductibles, further increasing the income gap between the rich and the poor. However, an article in the New York Times, "Obama's Health Law: Who Was Helped Most" by Kevin Quealy and Margot Sanger-Katz states that people with the lowest incomes benefit the most from the Affordable Care Act. They argue that the Act has "pushed back against inequality" (Sanger-Katz, Quealy 2014) by redistributing income to groups that fared poorly in the past and allowing low-income people to get insurance without paying for a premium. Our paper fits into this debate because our investigation will show if decreasing income increases support for government health insurance. This has the potential to open up a new discussion over how income inequality affects support for government health insurance, instead of asking how health insurance affects income inequality. 
+
+## 3 Data
+
+The source of the data used in this report comes from the ANES Guide to Public Opinion and Electoral Behavior, specifically from face-to-face interviews conducted by ANES from 1970 to 2016 on sample sizes ranging from N = 967 to N = 5909. Relevant summary statistics for this report include intercept values for our simple, full, and interaction regression models, which represent the starting income percentage (0-16%) that the other income percentages are compared to in terms of their support for government health insurance. Another summary statistic would be the year coefficient in the full and interaction model, which takes into the relationship between support for government health insurance and year for each income group. As well as this, the interaction terms in the interaction model (such as income17-33:year) give the effect of year on each income group individually (leading to different slopes for each income group). Another important summary statistic would be the p-value, which for each model tells whether the values found for each coefficient are statistically significant (p-value < 0.05). 
+
+For the simple model, the explanatory variable is income group (ranging from 0-16%, 17-33%, 34-67%, 68-95%, and 96-100%), for the full model it is income group and its relationship to year, and for the interaction model it is income group and its interaction with year. The outcome variable for all three models is support level for government health insurance, expressed in percent. (See regression table in Results section to view summary statistics)
+
+
+## 4 Methods
+
+Our question is whether decreasing income level increases support for government health insurance, and we therefore decided to analyze the differences in support for government health insurance between each income percentile, with various factors taken into account. To analyze the data, we created three regression models: a simple model that looks at support levels based on income group, a full model that looks at support levels based on income group and taking into account year, and an interaction model that looks at support levels and the interaction between income group and year. After creating these models, we put the summary statistics in a regression table using stargazer, created an ANOVA table, and analyzed the results of both to find which model was the best fit for our data. We found that the simple model (model 1) is the best fit for the data, since the interaction model is not statistically significant for any of its coefficients, and the full model is not statistically significant in its year or intercept, while the simple model does have a statistically significant intercept. The formula for the simple model is thus: Support = 45.57 + (Income Percentile Group). 
+
+After deciding on this model and deriving this formula, we created an interaction plot that uses the simple regression model to graph each  income percentile group with support level on the y axis and year on the x axis to help visualize the data. (See plot in Results section of report)
+
+
+## 5 Results
+
+```{r table 1, echo = FALSE, message = FALSE, results='asis'}
+# regression table using stargazer for the three models
+stargazer(lm_support_simple, lm_support_full, lm_support_interaction,
+          font.size = 'footnotesize', 
+          type = output_type,
+          header = FALSE) # turn off message about package
+```
+
+```{r plot 2, echo = FALSE, fig.height = 4, fig.width = 6}
+#plot for simple model
+interact_plot(lm_support_simple, pred = "year", modx = "income" , plot.points = TRUE, data = income_support) +
+  labs(title = "Support for Govt. Health Insurance by Income % (Simple)", x = "Year", y = "Support")
+```
+
+```{r, echo = FALSE}
+#ANOVA table of the three regressions
+anova(lm_support_simple, lm_support_full, lm_support_interaction) %>% 
+  kable()
+```
+
+
+After analysis, our results were that there is a statistically significant relationship between income group and support for government health insurance, specifically that as income group increases, support for government health insurance decreases. This holds true for every income group (p-value < 0.01) except for the income 17-33% group, which did decrease from the comparison group of income 0-16%, but was not statistically significant. Furthermore, support levels did not change based on year, as in both the full and interaction models, year was not statistically significant, nor were any of the interaction terms for year in income group. Thus, while we can reject the null hypothesis that income group does not affect support for government health insurance (except for income 17-33% group), we cannot reject the null hypothesis for year not affecting support for government health insurance by income group. Our results, except for the income 17-33% group, agree with our research question of whether decreasing income level increases support for government health insurance. The scope of inference for this report is based on the data used, in that its scope would lie within the United States population from 1970 - 2016, and not outside of that population or time range. 
+
+## 6 Discussion
+
+In our study, we investigated how a person's income affected their support for government health insurance. A limitation and threat to inference of our study is that we cannot make causal claims because no randomized treatment nor randomization was administered in generating the data. An implication of our study is that a person's income clearly affects their support for government health insurance. In the future, our study could be further extended to see how government health insurance changes as a function of income group, accounting for other factors such as Gender, Education Level, or Race. 
+
+
+## 7 Conclusion
+
+From our analysis, we have learned that for most income groups (except the 17-33% income group), the higher the income group, the less support for government health insurance. This supports Sanger-Katz' theory that the lower income groups are the most benefited by, and thus in the most support of, government health insurance. At the same time, this goes against Newkirk's theory that low-income groups would be in least support of government healthcare due to higher premiums. 
+
+
+## 8 Bibliography
+
+Sanger-Katz, Margot and Kevin Quealy. "Obama's Health Law: Who Was Helped Most." The New York Times, The New York Times, 29 Oct. 2014, www.nytimes.com/interactive/2014/10/29/upshot/obamacare-who-was-helped-most.html.
+
+"Top Tables." ANES | American National Election Studies, electionstudies.org/resources/anes-guide/top-tables/?id=32.
+
+Newkirk II, Vann R. "The American Health-Care System Increases Income Inequality." The Atlantic, Atlantic Media Company, 19 Jan. 2018, www.theatlantic.com/politics/archive/2018/01/health-care-income-inequality-premiums-deductibles-costs/550997/.
+
+## 9 Appendix
+
+```{r plot 3, echo = FALSE, fig.height = 4, fig.width = 6}
+#plot for full model
+interact_plot(lm_support_full, pred = "year", modx = "income" , plot.points = TRUE, data = income_support) +
+  labs(title = "Support for Govt. Health Insurance by Income % (Full)", x = "Year", y = "Support") +
+  labs(fill = "Income %") 
+```
+
+```{r plot 4, echo = FALSE, fig.height = 4, fig.width = 6}
+#plot for interaciton model
+interact_plot(lm_support_interaction, pred = "year", modx = "income" , plot.points = TRUE, data = income_support) +
+  labs(title = "Support for Govt. Health Insurance by Income % (Interact)", x = "Year", y = "Support")
+```
