@@ -1,0 +1,428 @@
+---
+title: "POL346 Take Home Final"
+author: "Mia Rosini"
+date: "`r Sys.Date()`"
+references:
+- author: 
+  - family: Zaller
+    given: John R
+  id: zaller1992nature
+  issued:
+    year: 1992
+  publisher: Cambridge University Press
+  title: The nature and origins of mass opinion
+  type: Book
+- author: 
+  - family: Lee
+    given: Taeku
+  id: lee2002mobilizing
+  issued:
+    year: 2002
+  publisher: University of Chicago Press
+  title: 'Mobilizing public opinion: Black insurgency and racial attitudes in the
+    civil rights era'
+  type: Book
+- author: 
+  - family: Hlavac
+    given: Marek
+  id: hlavac2018stargazer
+  issued:
+    year: 2018
+  publisher: R package version 5.2.2
+  title: 'Stargazer: Well-formatted regression and summary statistics tables'
+  type: article-journal
+- author: 
+  - family: Harris
+    given: Kathleen Mullan
+  - author: 
+    family: Udry
+    given: Richard J
+  id: harris2018national
+  issued:
+    year: 2018
+  page: 08-06
+  publisher: 'Ann Arbor, MI: Carolina Population Center, University of North Carolina-Chapel
+    Hill [distributor], Inter-university Consortium for Political and Social Research
+    [distributor]'
+  title: National longitudinal study of adolescent to adult health (add health), 1994-2008
+    [Public Use]
+  type: article-journal
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+```{r load_packages1, echo = FALSE, include=FALSE}
+library(tidyverse)
+library(stargazer)
+library(kableExtra)
+library(MASS)
+library(janitor)
+library(dplyr)
+library(ggplot2)
+library(broom)
+library(xtable)
+library(forcats)
+library(interactions)
+
+
+#install.packages("cowplot", repos = 'http://cran.us.r-project.org')
+library(cowplot)
+
+library(sjPlot)
+
+set.seed(1234567)
+```
+
+```{r load_data, echo = FALSE}
+#loading in the data
+load("ICPSR_21600/DS0001/21600-0001-Data.rda", verbose = FALSE)  
+
+# assign data to shorter named file
+health <- da21600.0001 
+```
+
+```{r rename_data, echo = FALSE}
+#changing names to more convenient names in data
+health <- health %>%
+  mutate(
+    religious = H1RE4,    # religious
+    happiness = PA20,     # general happiness
+    acceptance = H1PF35,  # feeling socially accepted
+    loved = S62P,       # feeling loved and wanted
+    mother = H1PF5,       # good relationship with mother
+    father = H1PF25,      # good relationship with father 
+    hispanic = S4,        # hispanic 
+    black = S6B,          # black 
+    white = S6A,          # white
+    asian = S6C,          # asian 
+    gender = S2           # gender 
+  )
+```
+
+
+```{r recode_data, echo = FALSE}
+# using case_when to recode
+  health <- health %>%
+    mutate(
+      religious = case_when(      
+        religious == '(1) (1) Very important'  ~ 1,
+        religious == '(2) (2) Fairly important' ~ 1,
+        religious == '(3) (3) Fairly unimportant' ~ 0,
+        religious == '(4) (4) Not important at all' ~ 0,
+        TRUE ~ as.numeric(NA)         
+        )
+    )
+
+health <- health %>%
+  mutate(
+    happiness = case_when(      
+      happiness == '(0) (0) No'  ~ 0,
+      happiness == '(1) (1) Yes' ~ 1,
+      TRUE ~ as.numeric(NA)         
+      )
+  )
+
+health <- health %>%
+  mutate(
+    acceptance = case_when(      
+      acceptance == '(1) (1) Strongly agree'  ~ 1,
+      acceptance == '(2) (2) Agree' ~ 1,
+      acceptance == '(4) (4) Disagree' ~ 0,
+      acceptance == '(5) (5) Strongly disagree' ~ 0,
+      TRUE ~ as.numeric(NA)         
+      )
+  )
+
+health <- health %>%
+  mutate(
+    loved = case_when(      
+      loved == '(1) (1) Strongly agree'  ~ 1,
+      loved == '(2) (2) Agree' ~ 1,
+      loved == '(4) (4) Disagree' ~ 0,
+      loved == '(5) (5) Strongly disagree' ~ 0,
+      TRUE ~ as.numeric(NA)         
+      )
+  )
+
+health <- health %>%
+  mutate(
+    mother = case_when(      
+      mother == '(1) (1) Strongly agree'  ~ 1,
+      mother == '(2) (2) Agree' ~ 1,
+      mother == '(4) (4) Disagree' ~ 0,
+      mother == '(5) (5) Strongly disagree' ~ 0,
+      TRUE ~ as.numeric(NA)         
+      )
+  )
+
+
+health <- health %>%
+  mutate(
+    father = case_when(      
+      father == '(1) (1) Strongly agree'  ~ 1,
+      father == '(2) (2) Agree' ~ 1,
+      father == '(4) (4) Disagree' ~ 0,
+      father == '(5) (5) Strongly disagree' ~ 0,
+      TRUE ~ as.numeric(NA)         
+      )
+  )
+
+health <- health %>%
+  mutate(
+    hispanic = case_when(      
+      hispanic == '(0) (0) No (skip to Q.6)'  ~ 0,
+      hispanic == '(1) (1) Yes (go to Q.5)' ~ 1,
+      TRUE ~ as.numeric(NA)         
+      )
+  )
+
+
+health <- health %>%
+  mutate(
+    black = case_when(      
+      black == '(0) (0) Not marked'  ~ 0,
+      black == '(1) (1) Marked' ~ 1,
+      TRUE ~ as.numeric(NA)         
+      )
+  )
+
+health <- health %>%
+  mutate(
+    white = case_when(      
+      white == '(0) (0) Not marked'  ~ 0,
+      white == '(1) (1) Marked' ~ 1,
+      TRUE ~ as.numeric(NA)         
+      )
+  )
+
+health <- health %>%
+  mutate(
+    asian = case_when(      
+      asian == '(0) (0) Not marked'  ~ 0,
+      asian == '(1) (1) Marked' ~ 1,
+      TRUE ~ as.numeric(NA)         
+      )
+  )
+
+health <- health %>%
+  mutate(
+    gender = case_when(      
+      gender == '(1) (1) Male'  ~ 0,
+      gender == '(2) (2) Female' ~ 1,
+      TRUE ~ as.numeric(NA)         
+      )
+  )
+```
+
+```{r shrink_data, echo = FALSE}
+small <- health %>%
+  dplyr::select(religious, happiness, acceptance, loved, 
+                mother, father, hispanic, black,
+                white, asian, gender) %>% # subset data
+  clean_names()
+```
+
+```{r, message = FALSE}
+library(naniar)
+
+library(Amelia)
+small_subset <- data.frame(small)
+small_imputed <- amelia(
+  x = small_subset,
+  m = 1,
+  idvars = "acceptance",
+  ords = c("religious", "happiness", "loved", "mother",
+           "father", "hispanic", "black", "asian", "white",
+           "gender")
+)
+
+#extract one imputed data set 
+small_final <- small_imputed$imputations$imp1
+
+#save file
+save(small_final, file = "small_final.Rdata")
+```
+
+```{r load_processed_data2, echo = FALSE}
+# loading processed data
+load("small_final.Rdata", verbose = FALSE) 
+```
+
+
+## 1 Introduction
+
+The main research question of this paper is: Does being religious affect general happiness? This question is important because around 77.2 percent of United States residents are religious, with the remaining 22.8 percent being unaffiliated ("Religion in America...", 2015). In addition, the United States is a Christian nation, as evidenced by the “under God” in the Pledge of Allegiance ("Should the Words...", 2019). With the majority of the United States being religious, I am interested to see if being religious influences a person’s general happiness. A regression will be run in this paper between being religious and general happiness, accounting for confounding variables such as having a good relationship with their mother or father, feeling socially accepted, and feeling loved and wanted. Demographic variables, such as race and gender, are also taken into account. 
+
+## 2 Theory
+
+There have been many previous publications researching how being religious affects general well-being. One publication, “Religion and Positive Adolescent Outcomes: A Review of Research and Theory” by Mark D. Regnerus supports the theory that being religious is positively associated with increased happiness. It found that more extensive religiosity contributes to better education outcomes, better emotional health, more satisfaction in the family, and more voluntarism (Regnerus 409). In addition, “Religion, Stress, and Mental Health in Adolescence: Findings from Add Health” by Jennifer G. Nooney, two components of the stress process, stress prevention and stress meditation, are important pathways that religion impacts adolescent depression and suicidal thoughts (Nooney 350). This paper will seek to support this theory: that religion improves general happiness. However, there are also competing theories. 
+
+“Linked Lives, Faith, and Behavior: Intergenerational Religious Influence on Adolescent Delinquency” by Mark D. Regnerus is a publication that is more critical of religion’s influence on adolescent behaviors. It notes that previous research that links religion and well-being fails to explore other relationships between parents and their children. The investigation conducted in this publication found that parental religious devotion protected girls better than boys in regard to delinquent behavior, and sometimes may amplify delinquency among boys (Regnerus 202). This paper supports the theory that being religious is not strongly positively associated with general happiness. 
+
+## 3 Data
+
+The source of our data used in this report comes from the National Longitudinal Study of Adolescent to Adult Health (Add Health) dataset, specifically from surveys conducted from 1994 to 2008 in the United States. For this report, I used data from the Wave I: In-Home Questionnaire, Public Use Sample. The explanatory variable was whether religion was important to a person and the outcome variable was their general happiness.Data that was also used includes various control and demographic variables taken from the dataset. These are: feeling socially accepted, feeling loved and wanted, having a good relationship with your mother and father, being Black, Hispanic, White, Asian, and being Male or Female. For each of these variables, the data was recoded using case_when so that the answers were either 1 or 0. For how important religion was, “very important”, and “fairly important” were recoded to 1 and “fairly unimportant” and “not important at all” were recoded to 0. I did not include the “neither agree or disagree” answer. For happiness, “yes” to being happy was recoded to 1 and “no” was recoded to 0. Happiness is a binary variable and is measured on a scale from 0 to 1 in this report. For the rest of the confounding variables, “strongly agree” and “agree” were recoded to 1 and “disagree” and “strongly disagree” were recoded to 0. For each race, being that race (Hispanic, White, Asian, Black) was recoded to 1 and not being that race was recoded to 0. The original variable names were then changed to simpler terms (for example, H1RE4 was changed to ‘happiness’) and a smaller dataset was created with just the variables that were recoded.  
+
+I reduced missingness through imputation in order to avoid biased results. To address heterogeneity in my data, I included different demographics in my regression and accounted for how being Hispanic, White, Asian, and Black, and how being Female, or Male, changed the results of my analysis. Relevant summary statistics for this report include intercept values for each of the regression models run because the intercepts represents how much general happiness increased or decreased as a result of each explanatory variable and confounding variable when included. See the regression table to view the summary statistics and see the Appendix to see the summary statistics table for all the data. 
+
+
+## 4 Methods
+
+The question of this report is whether being religious affects general happiness. By running four regressions, I found that being religious did not statistically significantly increase general happiness. I used multiple regression models to come to this finding. Four regressions were run and four models were created. We can see these regression in Table 1. Model 1 looked at happiness solely as a function of being religious. Model 2 looked at happiness as a function of being religious, accounting for confounding and demographic variables: feeling socially accepted, feeling loved, having a good relationship with their mother and father, being Hispanic, Black, White, Asian, and Male and Female. Model 3 looked at happiness as a function of being religious interacted with gender. Model 4 looked at happiness as a function of being religious interacted with being Hispanic. None of the models had statistically significant changes in happiness as a function of being religious, but because of the robustness of Model 2 (since it took into account all of the confounding and demographic variables), I decided that this model was the best fit. The formula for this model is:
+
+Happiness = 0.899 + 0.009(Religious) + 0.002(Acceptance) + 0.022(Loved) + 0.009(Mother) + 0.015(Father) - 0.027(Hispanic) - 0.010(Black) + 0.011(White) + 0.012(Asian) + 0.006(Female)
+
+According to Table 1 and Model 2, the relationship between the key explanatory variable (being religious) and the outcome variable (general happiness) is that being religious increases happiness by 0.009, when accounting for confounding and demographic variables. This is not a statistically significant increase in the amount of general happiness. This slight increase can be seen in Plot A in Figure 1, but this increase is not a statistically significant change. We can also see in the summary statistics table that being religious (the 1 in the table) has a slightly higher mean happiness than not being religious. See the Appendix for the full summary statistics table. 
+
+Model 3, which interacted being religious and gender, shows that being religious is associated with a 0.008 increase in general happiness, and being female is associated with a 0.014 increase in happiness. However, these are both not statistically significant changes. We can barely see this increase in the interaction plot (1 is Female, 0 is Male). When interacted, there is a decrease of 0.012 in happiness. This is not a statistically signficant change and this decrease can be seen in the interaction plot. 
+
+Model 4, which interacted being religious and being Hispanic, shows that being religious is associated with a decrease of 0.007 in general happiness, but this is not a statistically significant change. It also shows that being hispanic is associated with a decrease in 0.087 in general happiness, which is a statistically significant change. When being religious and being hispanic are interacted, there is an increase of 0.064 in happiness. We can see this in the interaction plot. In this plot, 1 is being hispanic and 0 is not being hispanic. All of these changes in happiness from Models 2, 3, and 4 can be seen in plots A, B, and C in Figure 1 respectively.  
+
+The scope of inference would be limited to United States residents from 1994 to 2008; these are the dates used and the location of the data collection in the Add Health dataset so we cannot confidently extend these findings to other locations or dates. 
+
+
+``` {r} 
+# summarize for summary statistics 
+small1 <- small_final %>%
+  group_by(religious) %>%
+  summarise(n = length(religious),
+            mean = mean(happiness, na.rm = TRUE),
+            )
+
+## Table of summary statistics
+small1 %>%
+  kable() %>%
+    kable_styling(                   
+      bootstrap_options = "striped", # add grey stripes to alternate rows
+      full_width = FALSE             # allow table to be narrower than full page
+      )
+```
+
+
+```{r regressions_2, echo = FALSE}
+#regression 
+lm1 <- lm(formula = happiness ~ religious, data = small_final)
+
+#regression for all confouding and demographic variables
+lm2 <- lm(formula = happiness ~ religious + acceptance
+          + loved + mother + father + hispanic 
+          + black + white + asian + gender, data = small_final)
+
+#regression for interaction between religious and gender 
+lm3 <- lm(formula = happiness ~ (religious * gender), data = small_final)
+
+#regression for religious and being hispanic
+lm4 <- lm(formula = happiness ~ (religious * hispanic), data = small_final)
+```
+
+
+```{r create_plots, echo = FALSE}
+# create sjPlot objects from models
+plot_1 <- plot_model(lm2, type = "pred") 
+
+# extract ggplot object from sjPlot object
+p1 <- plot_1$religious + 
+    ggtitle("Religious versus Happiness") + 
+    xlab("Being Religious") + 
+    ylab("Happiness")
+
+plot_2 <- plot_model(lm3, type = "pred")
+p2 <- plot_2$gender + 
+  ggtitle("Being Female versus Happiness") +
+  xlab("Being Female") + 
+  ylab("Happiness")
+
+
+plot_3 <- plot_model(lm4, type = "pred")
+p3 <- plot_3$hispanic + 
+  ggtitle("Being Hispanic versus Happiness") + 
+  xlab("Being Hispanic") + 
+  ylab("Happiness")
+```
+
+```{r plots_combined, echo = FALSE, fig.height = 11, fig.cap = "Plots of Happiness"}
+# plot ggplot objects together with labels
+cowplot::plot_grid(
+  p1, p2, p3,
+  nrow = 3,
+  labels = "AUTO"
+  )
+```
+
+```{r stargazer_2, echo = FALSE, results='asis'}
+#summary table of regression models
+  stargazer(lm1, lm2, lm3, lm4,
+            type = 'latex',
+            title = "Happiness as a Function of Religion with Confounding and Demographic Variables",
+            dep.var.labels = "General Happiness", 
+            covariate.labels = c("Being Religious", "Feeling Accepted", "Feeling Loved",
+                                 "Close with Mother", "Close with Father", "Hispanic",
+                                 "Black", "White", "Asian", "Female", "Religious:Female",
+                                 "Religious:Hispanic"),
+            font.size = 'footnotesize', 
+            column.sep.width = "1pt",
+            header = FALSE) 
+```
+
+```{r interaction plots, echo = FALSE,fig.height = 3, fig.width= 3.75, fig.cap = "Interaction Plots"}
+interact_plot(
+  lm3,
+  pred = religious,
+  modx = gender,
+  plot.points = TRUE
+)
+
+interact_plot(
+  lm4,
+  pred = religious,
+  modx = hispanic,
+  plot.points = TRUE
+)
+```
+
+
+
+## 6 Discussion
+
+A limit of this report is that we cannot make causal claims because there was neither randomized treatment nor randomization administered when the data was generated. The scope of inference is limited to the dates between 1994 – 2008 and in the United States. An implication of this study is that being religious is not associated with a statistically significant increase in general happiness. In the future, this investigation could be improved to include a wider range of dates and other locations in addition to the United States. It would be interesting to see how being religious affects happiness in other countries where religion is more important than it is in the United States. This investigation could also be improved to see how being religious not only affects happiness, but also how it affects other outcomes such as the motivation to do well in school, or likelihood to do drugs or drink alcohol. 
+
+
+## 7 Conclusion
+Looking at the results, it can be seen that even when accounting for various confounding and demographic variables, being religious does not statistically significantly increase general happiness. This thus supports the theory by Mark D. Regnerus that being religious is not necessarily associated with a positive increase in general happiness. However, it is important to not extend these findings outside of the scope of inference. Through this investigation, we have learned that being Hispanic is associated with a statistically significant decrease in happiness. To answer the original research question, between the years of 1994 – 2008 in the United States, being religious is associated with a slight increase in general happiness, but this increase is not large enough to be statistically significant.
+
+\newpage
+## 8 Bibliography
+
+Harris, Kathleen Mullan, and Richard J Udry. 2018. “National Longitudinal Study of Adolescent to AdultHealth (Add Health), 1994-2008 [Public Use].” Ann Arbor, MI: Carolina Population Center, Universityof North Carolina-Chapel Hill [distributor], Inter-university Consortium for Political and Social
+Research[distributor], 08–06.
+
+Hlavac, Marek. 2018. “Stargazer: Well-Formatted Regression and Summary Statistics Tables.” R packageversion 5.2.2.
+
+Nooney, Jennifer G. "Religion, Stress, and Mental Health in Adolescence: Findings from Add Health." Review of Religious Research 46, no. 4 (2005): 341-54. doi:10.2307/3512165.
+
+Regnerus, Mark D. "Religion and Positive Adolescent Outcomes: A Review of Research and Theory." Review of Religious Research 44, no. 4 (2003): 394-413. doi:10.2307/3512217.
+
+"Religion in America: U.S. Religious Data, Demographics and Statistics." Pew Research Center's Religion & Public Life Project. May 11, 2015. Accessed May 10, 2019. https://www.pewforum.org/religious-landscape-study/.
+
+"Should the Words "under God" Be in the US Pledge of Allegiance?" Should the Words "under God" Be in the US Pledge of Allegiance? Accessed May 10, 2019. https://undergod.procon.org/.
+
+\newpage
+## 9 Appendix 
+
+```{r stargazer_1, echo = FALSE, results='asis'}
+#summary statistics table of regression models using stargazer
+stargazer(small_final)
+```
+
+
