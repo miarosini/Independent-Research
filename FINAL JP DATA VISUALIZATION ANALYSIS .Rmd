@@ -1,0 +1,219 @@
+---
+title: "JP DATA 4/18"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("readxl")
+library(tidyverse)
+library(dplyr)
+library(sjPlot)
+library(stargazer)
+library(ggthemes)
+library(lme4)
+library(jtools)
+library(car)
+#install.packages("lme4")
+```
+
+UPLOAD DATASETS
+
+```{r}
+#Load Data
+Deport <- read_excel("22_Dataset.xlsx")
+Presidents <- read_excel("Presidents.xlsx")
+Obama_Imm_Or <- read_excel("Immigrants_Version2.xlsx")  %>% select(-x)
+
+Deport <- Deport %>% 
+  rename(
+    Year = `Fiscal Year Deported`,
+    Level = `Seriousness Level of Conviction`,
+    Country = `Place of Origin`,
+    Deportations = `Total Number of Deportations`
+  )
+```
+
+```{r}
+#Three Presidents, All Years Available
+Obama_Imm <- Obama_Imm_Or[1:57,]
+
+Imm_breakdown <- Obama_Imm %>% group_by(Region) %>% summarize(Total = sum(Immigrants))
+
+Bush_Imm <- read_excel("ACS_Bush_Immigrant.xlsx")
+
+Bush_breakdown <- Bush_Imm %>% group_by(Region) %>% summarize(Total = sum(`Total Immigrant Population`))
+
+Trump_Imm <- Obama_Imm_Or[58:64,]
+
+Trump_breakdown <- Trump_Imm %>% group_by(Region) %>% summarize(Total = sum(Immigrants))
+
+
+#Region Datasets
+OT_Regions <- read_excel("Regions.xlsx")
+Bush_Regions <- read_excel("Regions.xlsx")
+```
+
+Bush Regressions: 
+```{r}
+Bush1 <- merge(Bush_Regions, Deport)
+Bush2 <- merge(Bush1, Presidents)
+Bush3 <- merge(Bush2, Bush_Imm)
+Bush3 <- Bush3 %>% 
+  rename(
+    Immigrants = `Total Immigrant Population`
+  )
+
+Bush_Final <- Bush3 %>% group_by(Region, Level, Year) %>% mutate(TotalDeportations = sum(Deportations)) %>% select(Region, Level, President, Year, TotalDeportations, Immigrants) %>% group_by(Region, Year, Level) %>% unique()
+
+#Regressions
+Bush_Final$Level <- factor(Bush_Final$Level)
+Bush_Final$Level = relevel(Bush_Final$Level, ref = "Level 2 Crime")
+  
+Bush_Final$Region <- factor(Bush_Final$Region)
+Bush_Final$Region = relevel(Bush_Final$Region, ref = "Caribbean")
+
+Bush_Reg_Lev <- lm(TotalDeportations ~ Level*Region, data = Bush_Final)
+#vif(Bush_Reg_Lev)
+summary(Bush_Reg_Lev)
+
+Bush_Reg_Region <- lm(TotalDeportations ~ Region, data = Bush_Final)
+Bush_Reg_Year <-  lm(TotalDeportations ~ Year, data = Bush_Final)
+Bush_Reg_Immigrants <-  lm(TotalDeportations ~ Immigrants, data = Bush_Final)
+
+tab_model(Bush_Reg_Lev)
+tab_model(Bush_Reg_Region)
+tab_model(Bush_Reg_Year)
+tab_model(Bush_Reg_Immigrants, digits = 4)
+```
+
+
+Obama Regressions
+```{r}
+#Merging Datasets
+Obama_1 <- merge(OT_Regions, Deport)
+Obama_2 <- merge(Obama_1, Presidents)
+Obama_3 <- merge(Obama_2, Obama_Imm)
+
+Obama_Final <- Obama_3 %>% group_by(Region, Level, Year) %>% mutate(TotalDeportations = sum(Deportations)) %>% select(Region, Level, President, Year, TotalDeportations, Immigrants) %>% group_by(Region, Year, Level) %>% unique()
+
+Obama_Final <- Obama_Final[33:221,]
+
+#Regressions
+Obama_Final$Level <- factor(Obama_Final$Level)
+Obama_Final$Level = relevel(Obama_Final$Level, ref = "Level 2 Crime")
+  
+Obama_Final$Region <- factor(Obama_Final$Region)
+Obama_Final$Region = relevel(Obama_Final$Region, ref = "Africa")
+
+Obama_Reg_Lev <- lm(TotalDeportations ~ Level*Region, data = Obama_Final) #Interaction
+summary(Obama_Reg_Lev)
+Obama_Reg_Region <- lm(TotalDeportations ~ Region, data = Obama_Final)
+
+Obama_Reg_Year <- lm(TotalDeportations ~ Year, data = Obama_Final)
+Obama_Reg_Imm <- lm(TotalDeportations ~ Immigrants, data = Obama_Final)
+
+
+tab_model(Obama_Reg_Lev)
+tab_model(Obama_Reg_Region)
+tab_model(Obama_Reg_Year)
+tab_model(Obama_Reg_Imm, digits = 4)
+```
+
+Trump Regressions
+
+```{r}
+#Merging Datasets
+Trump_1 <- merge(OT_Regions, Deport)
+Trump_2 <- merge(Trump_1, Presidents)
+Trump_3 <- merge(Trump_2, Trump_Imm)
+
+Trump_Final <- Trump_3 %>% group_by(Region, Level, Year) %>% mutate(TotalDeportations = sum(Deportations)) %>% select(Region, Level, President, Year, TotalDeportations, Immigrants) %>% group_by(Region, Year, Level) %>% unique()
+
+#Regressions
+Trump_Final$Level <- factor(Trump_Final$Level)
+Trump_Final$Level = relevel(Trump_Final$Level, ref = "Level 2 Crime")
+  
+Trump_Final$Region <- factor(Trump_Final$Region)
+Trump_Final$Region = relevel(Trump_Final$Region, ref = "Africa")
+
+Trump_Reg_Lev <- lm(TotalDeportations ~ Level + Region*Level, data = Trump_Final) #why doesn't interaction work? 
+vif(Trump_Reg_Lev)
+summary(Trump_Reg_Lev)
+
+
+Trump_Reg_Region <- lm(TotalDeportations ~ Region, data = Trump_Final)
+Trump_Reg_Imm <- lm(TotalDeportations ~ Immigrants, data = Obama_Final)
+
+tab_model(Trump_Reg_Lev)
+tab_model(Trump_Reg_Region)
+tab_model(Trump_Reg_Imm, digits = 4)
+
+
+
+```
+
+COMPARE AND PLOT FOR PAPER:
+- OBAMA 2016
+- TRUMP 2017
+- BUSH 2007 
+
+```{r}
+#Bush - 2007
+Bush <- Bush_Final %>% ungroup() %>% filter(Year == 2007) %>% mutate(AllDeportations = sum(TotalDeportations)) %>% group_by(Level) %>% mutate(Percent = TotalDeportations/AllDeportations) %>% select(Region, TotalDeportations, AllDeportations, Percent, Level) 
+
+#BoxPlot
+Bush_Final %>%
+  ggplot() + aes(x = Level, y = TotalDeportations) +
+  geom_boxplot() + labs(x="Level",y="Percent",title="Deportatons in 2007") 
+
+New <- Bush %>% group_by(Level) %>% summarize(TotalPerc = sum(Percent))  
+
+Bush_all <- Bush_Final %>% ungroup() %>% mutate(AllDeportations = sum(TotalDeportations)) %>% group_by(Level) %>% mutate(Percent = TotalDeportations/AllDeportations) %>% select(Region, TotalDeportations, AllDeportations, Percent, Level) 
+
+New_all <- Bush_all %>% group_by(Level) %>% summarize(TotalPerc = sum(Percent))  
+
+ggplot(data = Bush, mapping = aes(x = Level)) + geom_bar(stat = "identity", position = "stack", mapping = aes(y = Percent, fill = Region)) + ylim(0,0.8) + labs(x = "Level of Crime Committed", y = "Percent of Deportations", title = "Deportations in 2007 (Bush)") + theme_few()
+
+ggplot(data = Bush, mapping = aes(x = Level, y = Percent, color = Region)) + geom_point() + geom_line() 
+
+Bush$Level <- factor(Bush$Level, levels = c("Level 1 Crime", "Level 2 Crime", "Level 3 Crime", "No conviction"))
+
+#ggplot(data = Bush, mapping = aes(x = Level)) + geom_bar(stat = "identity", position = "stack", mapping = aes(y = Percent, fill = Region)) + ylim(0,0.6) + labs(x = "Level of Crime Committed", y = "Percent of Deportations", title = "Deportations in 2007 (Bush)") + theme_few()
+```
+
+PLOT FOR REFERENCE: (APPENDIX)
+- BUSH 2003 - 2007
+- OBAMA 2010 - 2016 
+
+```{r}
+#Bush 2003 - 2007
+Bush_all <- Bush_Final %>% ungroup() %>% mutate(AllDeportations = sum(TotalDeportations)) %>% group_by(Level) %>% mutate(Percent = TotalDeportations/AllDeportations) %>% select(Region, TotalDeportations, AllDeportations, Percent, Level) 
+
+Bush_all$Level <- factor(Bush_all$Level, levels = c("Level 1 Crime", "Level 2 Crime", "Level 3 Crime", "No conviction"))
+
+ggplot(data = Bush_all, mapping = aes(x = Level)) + geom_bar(stat = "identity", position = "stack", mapping = aes(y = Percent, fill = Region)) + ylim(0,0.6) + labs(x = "Level of Crime Committed", y = "Percent of Deportations", title = "Deportations from 2003 - 2007 (Bush)") + theme_few()
+
+#Obama 2010 - 2016
+Obama_all <- Obama_Final %>% ungroup() %>% mutate(AllDeportations = sum(TotalDeportations)) %>% group_by(Level) %>% mutate(Percent = TotalDeportations/AllDeportations) %>% select(Region, TotalDeportations, AllDeportations, Percent, Level) 
+
+Obama_all$Level <- factor(Obama_all$Level, levels = c("Level 1 Crime", "Level 2 Crime", "Level 3 Crime", "No conviction"))
+
+ggplot(data = Obama_all, mapping = aes(x = Level)) + geom_bar(stat = "identity", position = "stack", mapping = aes(y = Percent, fill = Region)) + ylim(0,0.6) + labs(x = "Level of Crime Committed", y = "Percent of Deportations", title = "Deportations from 2008 - 2016 (Obama)") + theme_few()
+
+
+New_all <- Obama_all %>% group_by(Level) %>% summarize(TotalPerc = sum(Percent))  
+
+```
+
+
+
+
+
+
+
+
+
+
