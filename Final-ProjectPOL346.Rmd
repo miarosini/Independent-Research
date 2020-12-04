@@ -1,5 +1,5 @@
 ---
-title: "POL346 Take Home Final"
+title: "POL346 Final"
 author: "Mia Rosini"
 date: "`r Sys.Date()`"
 references:
